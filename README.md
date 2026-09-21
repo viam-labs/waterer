@@ -15,7 +15,11 @@ Wraps any `rdk:component:switch` (smart plug, GPIO relay, etc.) with:
 |---|---|---|
 | `viam-labs:waterer:pump` | `rdk:component:generic` | Wraps a Switch dep with schedule + safety logic |
 
-## Configuration
+## Pump
+
+Configuration and commands for the `viam-labs:waterer:pump` model below.
+
+### Configuration
 
 ```json
 {
@@ -51,7 +55,7 @@ Each schedule: `{name, time (HH:MM), dose_ml, days_of_week?, enabled?}`. Empty o
 
 State persists to `~/.viam/waterer-<name>-state.json`.
 
-## Commands
+### Commands
 
 All via `do_command`.
 
@@ -120,7 +124,7 @@ Force the switch off. Emergency cut. Does not modify daily total or state.
 
 `ids` must include every existing schedule exactly once.
 
-## Calibration
+### Calibration
 
 `ml_per_second` is the one calibration knob and it depends on your specific pump + tubing + reservoir height. Steps:
 
@@ -131,7 +135,7 @@ Force the switch off. Emergency cut. Does not modify daily total or state.
 5. Repeat twice, average.
 6. Update `ml_per_second` in the config and save.
 
-## Safety notes
+### Safety notes
 
 - Set `max_runtime_seconds` to roughly **1.5× your longest single dose** in seconds. Tighter is safer.
 - Set `max_daily_ml` to roughly **1.2× your intended daily total**. Prevents a runaway loop from draining the reservoir.
