@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from viam.components.generic import Generic
+from viam.components.sensor import Sensor
 from viam.components.switch import Switch
 from viam.proto.app.robot import ComponentConfig
 from viam.proto.common import ResourceName
@@ -118,6 +119,8 @@ class Pump(Generic):
         super().__init__(name)
         self._switch: Switch | None = None
         self._switch_name: str = ""
+        self._events_sensor: Sensor | None = None
+        self._events_sensor_name: str = ""
         self._ml_per_second: float = DEFAULT_ML_PER_SECOND
         self._max_runtime_seconds: float = DEFAULT_MAX_RUNTIME_SECONDS
         self._max_daily_ml: float = DEFAULT_MAX_DAILY_ML
@@ -159,7 +162,13 @@ class Pump(Generic):
                 raise ValueError("`schedules` must be a list")
             for entry in raw_schedules:
                 _normalize_schedule(entry)
-        return [switch_name]
+        deps = [switch_name]
+        events_sensor = attrs.get("events_sensor")
+        if events_sensor is not None:
+            if not isinstance(events_sensor, str) or not events_sensor:
+                raise ValueError("`events_sensor` must be a non-empty string")
+            deps.append(events_sensor)
+        return deps
 
     def reconfigure(
         self,
@@ -178,13 +187,26 @@ class Pump(Generic):
             attrs.get("state_path") or DEFAULT_STATE_PATH.format(name=config.name)
         )
 
+        self._events_sensor_name = str(attrs.get("events_sensor") or "")
+
         self._switch = None
+        self._events_sensor = None
         for name, resource in dependencies.items():
             if name.name == self._switch_name and isinstance(resource, Switch):
                 self._switch = resource
-                break
+            elif (
+                self._events_sensor_name
+                and name.name == self._events_sensor_name
+                and isinstance(resource, Sensor)
+            ):
+                self._events_sensor = resource
         if self._switch is None:
             raise RuntimeError(f"Switch dependency {self._switch_name!r} not found")
+        if self._events_sensor_name and self._events_sensor is None:
+            LOGGER.warning(
+                "events_sensor %r not found among dependencies; events will not be pushed",
+                self._events_sensor_name,
+            )
 
         self._state = self._load_and_seed_state(attrs)
         self._state_lock = asyncio.Lock()
@@ -312,6 +334,19 @@ class Pump(Generic):
             }
             self._save_state()
 
+        cause = "manual" if source == "manual" else "scheduled"
+        event: dict[str, Any] = {
+            "event_type": "water_dispensed",
+            "source": self.name,
+            "at": finished_at.isoformat(),
+            "ml": round(ml, 1),
+            "seconds": round(seconds, 2),
+            "cause": cause,
+        }
+        if cause == "scheduled" and source.startswith("schedule:"):
+            event["schedule_id"] = source.removeprefix("schedule:")
+        await self._push_event(event)
+
         return {
             "ok": True,
             "seconds": seconds,
@@ -320,6 +355,14 @@ class Pump(Generic):
             "finished_at": finished_at.isoformat(),
             "daily_total_ml": self._state["daily_total"]["ml"],
         }
+
+    async def _push_event(self, event: dict) -> None:
+        if self._events_sensor is None:
+            return
+        try:
+            await self._events_sensor.do_command({"command": "push_event", "event": event})
+        except Exception as e:
+            LOGGER.warning("push_event failed: %s", e)
 
     async def _dispense_ml(self, ml: float, source: str) -> dict:
         ml = float(ml)
