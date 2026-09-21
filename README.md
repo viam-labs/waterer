@@ -13,11 +13,11 @@ Wraps any `rdk:component:switch` (smart plug, GPIO relay, etc.) with:
 
 | Model | API | Purpose |
 |---|---|---|
-| `viam-labs:waterer:pump` | `rdk:component:generic` | Wraps a Switch dep with schedule + safety logic |
+| `viam:waterer:pump` | `rdk:component:generic` | Wraps a Switch dep with schedule + safety logic |
 
 ## Pump
 
-Configuration and commands for the `viam-labs:waterer:pump` model below.
+Configuration and commands for the `viam:waterer:pump` model below.
 
 ### Configuration
 
@@ -25,7 +25,7 @@ Configuration and commands for the `viam-labs:waterer:pump` model below.
 {
   "name": "pump",
   "type": "generic",
-  "model": "viam-labs:waterer:pump",
+  "model": "viam:waterer:pump",
   "depends_on": ["my_plug"],
   "attributes": {
     "switch_name": "my_plug",

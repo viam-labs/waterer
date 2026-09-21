@@ -1,12 +1,12 @@
 {
-    "module_id": "viam-labs:waterer",
+    "module_id": "viam:waterer",
     "visibility": "public",
     "url": "https://github.com/viam-labs/waterer",
     "description": "Scheduled pump controller with dose-in-ml semantics and hard safety caps. Wraps any switch component.",
     "models": [
         {
             "api": "rdk:component:generic",
-            "model": "viam-labs:waterer:pump",
+            "model": "viam:waterer:pump",
             "markdown_link": "README.md#pump"
         }
     ],

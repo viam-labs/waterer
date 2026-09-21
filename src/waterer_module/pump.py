@@ -112,7 +112,7 @@ def _empty_state() -> dict:
 
 
 class Pump(Generic):
-    MODEL: ClassVar[Model] = Model(ModelFamily("viam-labs", "waterer"), "pump")
+    MODEL: ClassVar[Model] = Model(ModelFamily("viam", "waterer"), "pump")
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
