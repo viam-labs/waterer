@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import uuid
+from collections import deque
 from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -36,6 +37,8 @@ DEFAULT_POLL_INTERVAL_SEC = 60
 DEFAULT_ML_PER_SECOND = 20.0
 DEFAULT_MAX_RUNTIME_SECONDS = 60.0
 DEFAULT_MAX_DAILY_ML = 5000.0
+
+DISPENSE_HISTORY_MAX = 200
 # How late a scheduled fire can still run after its HH:MM before we mark
 # it missed instead. Keeps a Pi that just rebooted from firing a
 # schedule that should have happened hours ago.
@@ -130,6 +133,7 @@ class Pump(Generic):
         self._state_lock: asyncio.Lock | None = None
         self._bg_task: asyncio.Task | None = None
         self._dispense_lock: asyncio.Lock | None = None
+        self._dispense_history: deque[dict] = deque(maxlen=DISPENSE_HISTORY_MAX)
 
     @classmethod
     def new(
@@ -349,6 +353,7 @@ class Pump(Generic):
         }
         if cause == "scheduled" and source.startswith("schedule:"):
             event["schedule_id"] = source.removeprefix("schedule:")
+        self._dispense_history.append(event)
         await self._push_event(event)
 
         return {
@@ -581,4 +586,6 @@ class Pump(Generic):
             return await self._set_schedule_enabled(command)
         if verb == "reorder_schedules":
             return await self._reorder_schedules(command)
+        if verb == "get_history":
+            return {"history": list(self._dispense_history)}
         raise ValueError(f"unknown command: {verb!r}")
