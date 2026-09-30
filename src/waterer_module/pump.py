@@ -142,7 +142,7 @@ class Pump(Generic):
         return p
 
     @classmethod
-    def validate_config(cls, config: ComponentConfig) -> Sequence[str]:
+    def validate_config(cls, config: ComponentConfig) -> tuple[Sequence[str], Sequence[str]]:
         attrs = struct_to_dict(config.attributes)
         switch_name = attrs.get("switch_name")
         if not isinstance(switch_name, str) or not switch_name:
@@ -162,13 +162,17 @@ class Pump(Generic):
                 raise ValueError("`schedules` must be a list")
             for entry in raw_schedules:
                 _normalize_schedule(entry)
-        deps = [switch_name]
+        # Required: RDK must defer construction until both are present.
+        # If events_sensor lands as an optional dep, scheduled dispenses
+        # can fire while self._events_sensor is still None and no event
+        # is ever pushed — so notifications silently stop working.
+        required: list[str] = [switch_name]
         events_sensor = attrs.get("events_sensor")
         if events_sensor is not None:
             if not isinstance(events_sensor, str) or not events_sensor:
                 raise ValueError("`events_sensor` must be a non-empty string")
-            deps.append(events_sensor)
-        return deps
+            required.append(events_sensor)
+        return required, []
 
     def reconfigure(
         self,
@@ -358,6 +362,11 @@ class Pump(Generic):
 
     async def _push_event(self, event: dict) -> None:
         if self._events_sensor is None:
+            LOGGER.warning(
+                "events_sensor %r not resolved; dropping event %s",
+                self._events_sensor_name,
+                event.get("event_type"),
+            )
             return
         try:
             await self._events_sensor.do_command({"command": "push_event", "event": event})
@@ -534,6 +543,8 @@ class Pump(Generic):
                 "ml_per_second": self._ml_per_second,
                 "max_runtime_seconds": self._max_runtime_seconds,
                 "max_daily_ml": self._max_daily_ml,
+                "events_sensor_name": self._events_sensor_name,
+                "events_sensor_ready": self._events_sensor is not None,
                 "daily_total": dict(self._state["daily_total"]),
                 "last_dispense": (
                     dict(self._state["last_dispense"]) if self._state.get("last_dispense") else None
